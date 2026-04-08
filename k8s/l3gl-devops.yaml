@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: product-api-config
+  namespace: devops-l3gl
+data:
+  DB_HOST: "mysql-service"
+  DB_NAME: "product_core"
+  DB_USER: "root"
+  DB_PASSWORD: "s2q4l27"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-api-deployment
+  namespace: devops-l3gl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: product-api
+  template:
+    metadata:
+      labels:
+        app: product-api
+    spec:
+      containers:
+        - name: product-api
+          image: soumayatou/product-api:latest
+          ports:
+            - containerPort: 8086
+          envFrom:
+            - configMapRef:
+                name: product-api-config
+          resources:
+            requests:
+              memory: "250Mi"
+              cpu: "200m"
+            limits:
+              memory: "500Mi"
+              cpu: "400m"
+          livenessProbe:
+            httpGet:
+              path: /l3gl/actuator/health/liveness
+              port: 8086
+            initialDelaySeconds: 120
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /l3gl/actuator/health/readiness
+              port: 8086
+            initialDelaySeconds: 120
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-api-service
+  namespace: devops-l3gl
+spec:
+  selector:
+    app: product-api
+  type: ClusterIP
+  ports:
+    - port: 8086
+      targetPort: 8086
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: product-api-ingress
+  namespace: devops-l3gl
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /l3gl
+            pathType: Prefix
+            backend:
+              service:
+                name: product-api-service
+                port:
+                  number: 8086
+
